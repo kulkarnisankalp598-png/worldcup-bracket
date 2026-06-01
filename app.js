@@ -226,6 +226,122 @@ document.getElementById("teamModal").addEventListener("click", e => {
   if (e.target===document.getElementById("teamModal")) closeModal();
 });
 
+// ===================== BRACKET VIEWER =====================
+function viewBracket(entryJson) {
+  const entry = typeof entryJson === "string" ? JSON.parse(entryJson) : entryJson;
+  if (!entry.bracket) { showToast("⚠️ No bracket data saved"); return; }
+
+  let s;
+  try {
+    s = JSON.parse(decodeURIComponent(escape(atob(entry.bracket))));
+  } catch(e) { showToast("⚠️ Could not load bracket"); return; }
+
+  const existing = document.getElementById("bracketViewerModal");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.className = "bracket-modal-overlay";
+  overlay.id = "bracketViewerModal";
+
+  const groupRows = Object.entries(s.groupPicks||{}).map(([letter, gp]) => {
+    if (!gp || Array.isArray(gp)) return "";
+    return `
+      <div class="bracket-viewer-group">
+        <div class="bracket-viewer-group-label">GROUP ${letter}</div>
+        ${gp.first  ? `<div class="bracket-viewer-team">${flagImg(gp.first,"circle")} 🥇 ${gp.first}</div>`   : ""}
+        ${gp.second ? `<div class="bracket-viewer-team">${flagImg(gp.second,"circle")} 🥈 ${gp.second}</div>` : ""}
+        ${gp.third  ? `<div class="bracket-viewer-team">${flagImg(gp.third,"circle")} 🥉 ${gp.third}</div>`   : ""}
+      </div>
+    `;
+  }).join("");
+
+  const knockoutRows = [
+    { label: "Round of 32",   picks: s.r32Picks||{}, pts: "+2" },
+    { label: "Round of 16",   picks: s.r16Picks||{}, pts: "+4" },
+    { label: "Quarterfinals", picks: s.qfPicks||{},  pts: "+8" },
+    { label: "Semifinals",    picks: s.sfPicks||{},  pts: "+16" },
+  ].map(({ label, picks, pts }) => {
+    const teams = Object.values(picks).filter(Boolean);
+    if (!teams.length) return "";
+    return `
+      <div class="bracket-viewer-section">
+        <div class="bracket-viewer-section-title">${label}</div>
+        <div class="bracket-viewer-picks">
+          ${teams.map(t => `
+            <div class="bracket-viewer-pick">
+              ${flagImg(t,"circle")}
+              <span style="flex:1">${t}</span>
+              <span style="color:var(--gold);font-size:0.75rem">${pts} pts</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  overlay.innerHTML = `
+    <div class="bracket-modal-card">
+      <button class="modal-close" onclick="document.getElementById('bracketViewerModal').remove()">✕</button>
+      <div class="bracket-viewer-header">
+        <div class="bracket-viewer-name">${entry.name}'s Bracket</div>
+        <div class="bracket-viewer-pts">${entry.points} pts</div>
+      </div>
+
+      <div class="bracket-viewer-section">
+        <div class="bracket-viewer-section-title">GROUP STAGE PICKS</div>
+        <div class="bracket-viewer-groups">
+          ${groupRows || '<p style="color:var(--gray);font-size:0.82rem">No group picks saved</p>'}
+        </div>
+      </div>
+
+      ${(s.bestThird||[]).length ? `
+        <div class="bracket-viewer-section">
+          <div class="bracket-viewer-section-title">BEST 3RD PLACE PICKS</div>
+          <div class="bracket-viewer-picks">
+            ${s.bestThird.map(t => `
+              <div class="bracket-viewer-pick">
+                ${flagImg(t,"circle")}
+                <span style="flex:1">${t}</span>
+                <span style="color:var(--gold);font-size:0.75rem">+1 pt</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      ` : ""}
+
+      ${knockoutRows}
+
+      ${s.thirdPick ? `
+        <div class="bracket-viewer-section">
+          <div class="bracket-viewer-section-title">3RD PLACE PICK</div>
+          <div class="bracket-viewer-pick">
+            ${flagImg(s.thirdPick,"circle")}
+            <span style="flex:1">${s.thirdPick}</span>
+            <span style="color:var(--gold);font-size:0.75rem">+16 pts</span>
+          </div>
+        </div>
+      ` : ""}
+
+      ${s.finalPick ? `
+        <div class="bracket-viewer-section">
+          <div class="bracket-viewer-section-title">🏆 CHAMPION PICK</div>
+          <div class="bracket-viewer-pick champion">
+            ${flagImg(s.finalPick,"circle")}
+            <span style="flex:1;font-weight:700">${s.finalPick}</span>
+            <span style="color:var(--gold);font-size:0.75rem">+32 pts</span>
+          </div>
+        </div>
+      ` : ""}
+    </div>
+  `;
+
+  overlay.addEventListener("click", e => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  document.body.appendChild(overlay);
+}
+
 // ===================== SCORING ENGINE =====================
 function calcScore(s, live) {
   let pts = 0;
@@ -440,22 +556,25 @@ function renderLeaderboardFromEntries(entries) {
   const medals = ["🥇","🥈","🥉"];
   const myName = localStorage.getItem("wc2026_myname") || "";
 
-  el.innerHTML = entries.map((e, i) => `
-    <div class="leaderboard-row ${i===0?"first":""}">
-      <span class="lb-rank">${medals[i]||"#"+(i+1)}</span>
-      <span class="lb-name">${e.name}</span>
-      <span class="lb-champion">
-        ${e.champion&&FLAGS[e.champion]
-          ? `<img class="flag flag-rect" src="${FLAGS[e.champion]}" style="width:22px;height:15px"> ${e.champion}`
-          : e.champion||"TBD"}
-      </span>
-      <span class="lb-pts">${e.points} pts</span>
-      <span class="lb-date">${e.savedAt}</span>
-      ${!TOURNAMENT_STARTED && myName.toLowerCase()===e.name.toLowerCase()
-        ? `<button class="lb-delete" onclick="deleteEntry('${e.name}')">✕</button>`
-        : '<span style="width:24px"></span>'}
-    </div>
-  `).join("");
+  el.innerHTML = entries.map((e, i) => {
+    const entryJson = JSON.stringify(e).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+    return `
+      <div class="leaderboard-row ${i===0?"first":""}">
+        <span class="lb-rank">${medals[i]||"#"+(i+1)}</span>
+        <span class="lb-name-clickable" onclick='viewBracket(${JSON.stringify(e).replace(/</g,"&lt;").replace(/>/g,"&gt;")})'>${e.name} 👁</span>
+        <span class="lb-champion">
+          ${e.champion&&FLAGS[e.champion]
+            ? `<img class="flag flag-rect" src="${FLAGS[e.champion]}" style="width:22px;height:15px"> ${e.champion}`
+            : e.champion||"TBD"}
+        </span>
+        <span class="lb-pts">${e.points} pts</span>
+        <span class="lb-date">${e.savedAt}</span>
+        ${!TOURNAMENT_STARTED && myName.toLowerCase()===e.name.toLowerCase()
+          ? `<button class="lb-delete" onclick="deleteEntry('${e.name}')">✕</button>`
+          : '<span style="width:24px"></span>'}
+      </div>
+    `;
+  }).join("");
 }
 
 async function recalcLeaderboardScores(entries) {
@@ -637,7 +756,7 @@ async function fetchLiveResults() {
 function renderGroups() {
   const grid=document.getElementById("groupsGrid");
   grid.innerHTML="";
-  const isLocked=state.locked.group || TOURNAMENT_STARTED;
+  const isLocked=state.locked.group||TOURNAMENT_STARTED;
 
   Object.entries(GROUPS).forEach(([letter,teams])=>{
     const gp=state.groupPicks[letter]||{};
@@ -688,7 +807,7 @@ function renderGroups() {
 }
 
 function cycleGroupPick(letter, teamName) {
-  if (state.locked.group || TOURNAMENT_STARTED) return;
+  if (state.locked.group||TOURNAMENT_STARTED) return;
   if (!state.groupPicks[letter]) state.groupPicks[letter]={};
   const gp=state.groupPicks[letter];
   const pos=gp.first===teamName?1:gp.second===teamName?2:gp.third===teamName?3:0;

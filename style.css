@@ -368,7 +368,7 @@ main {
   outline: none;
   transition: border-color 0.2s;
 }
-.name-input:focus       { border-color: var(--gold); }
+.name-input:focus        { border-color: var(--gold); }
 .name-input::placeholder { color: var(--gray); }
 
 .leaderboard-empty {
@@ -398,7 +398,18 @@ main {
 .leaderboard-row.first { border-color: var(--gold); background: rgba(245,197,24,0.06); }
 
 .lb-rank { font-size: 1.2rem; min-width: 28px; }
-.lb-name { font-weight: 700; font-size: 0.95rem; flex: 1; min-width: 100px; }
+.lb-name-clickable {
+  font-weight: 700;
+  font-size: 0.95rem;
+  flex: 1;
+  min-width: 100px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(245,197,24,0.4);
+  text-underline-offset: 3px;
+  transition: color 0.2s;
+}
+.lb-name-clickable:hover { color: var(--gold); }
 .lb-champion {
   display: flex; align-items: center; gap: 6px;
   font-size: 0.82rem; color: var(--gray); flex: 1; min-width: 120px;
@@ -531,10 +542,7 @@ main {
   flex-shrink: 0;
 }
 
-.pos-badge {
-  font-size: 1rem;
-  flex-shrink: 0;
-}
+.pos-badge { font-size: 1rem; flex-shrink: 0; }
 
 .check-icon {
   font-size: 0.9rem;
@@ -621,7 +629,7 @@ main {
   cursor: pointer;
   transition: all 0.2s;
 }
-.third-pool-card:hover   { border-color: rgba(205,127,50,0.5); background: rgba(205,127,50,0.05); }
+.third-pool-card:hover    { border-color: rgba(205,127,50,0.5); background: rgba(205,127,50,0.05); }
 .third-pool-card.selected { border-color: var(--bronze); background: rgba(205,127,50,0.12); }
 
 .third-pool-name  { font-weight: 600; font-size: 0.88rem; flex: 1; }
@@ -818,6 +826,132 @@ main {
 
 .modal-status { display: flex; justify-content: center; margin-top: 8px; }
 
+/* ===================== BRACKET VIEWER MODAL ===================== */
+.bracket-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(6px);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.bracket-modal-card {
+  background: #0f2a0f;
+  border: 1px solid var(--gold);
+  border-radius: 18px;
+  padding: 32px;
+  max-width: 600px;
+  width: 100%;
+  position: relative;
+  animation: modalIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.bracket-viewer-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.bracket-viewer-name {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  letter-spacing: 3px;
+  color: var(--gold);
+  flex: 1;
+}
+
+.bracket-viewer-pts {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--gold);
+  background: rgba(245,197,24,0.1);
+  border: 1px solid var(--gold);
+  padding: 4px 12px;
+  border-radius: 8px;
+}
+
+.bracket-viewer-section { margin-bottom: 20px; }
+
+.bracket-viewer-section-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 3px;
+  color: var(--gold);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.bracket-viewer-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.bracket-viewer-group {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.bracket-viewer-group-label {
+  font-size: 0.65rem;
+  color: var(--gold);
+  letter-spacing: 2px;
+  font-family: var(--font-display);
+  margin-bottom: 6px;
+}
+
+.bracket-viewer-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  margin-bottom: 4px;
+}
+.bracket-viewer-team:last-child { margin-bottom: 0; }
+
+.bracket-viewer-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bracket-viewer-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+}
+
+.bracket-viewer-pick.champion {
+  border-color: var(--gold);
+  background: rgba(245,197,24,0.08);
+}
+
+.bracket-viewer-round {
+  font-size: 0.65rem;
+  color: var(--gray);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  min-width: 80px;
+}
+
 /* ===================== TOAST ===================== */
 .toast {
   position: fixed;
@@ -853,4 +987,6 @@ main {
   .rating-grade { font-size: 3.5rem; }
   .leaderboard-row { gap: 8px; }
   .third-pool-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .bracket-modal-card { padding: 20px 16px; }
+  .bracket-viewer-groups { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
 }
