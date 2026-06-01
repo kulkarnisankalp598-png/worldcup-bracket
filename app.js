@@ -1,30 +1,3 @@
-// ===================== FIREBASE =====================
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc, getDocs }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey:            "AIzaSyAaoIzoRf6MuTAVgX6glWv_wfZunZAT27M",
-  authDomain:        "worldcup-bracket-2026.firebaseapp.com",
-  projectId:         "worldcup-bracket-2026",
-  storageBucket:     "worldcup-bracket-2026.firebasestorage.app",
-  messagingSenderId: "533452162141",
-  appId:             "1:533452162141:web:85b6c9c704f6b7970679b4"
-};
-
-const firebaseApp = initializeApp(firebaseConfig);
-const db          = getFirestore(firebaseApp);
-const LB          = "leaderboard2026";
-
-function initLeaderboardListener() {
-  onSnapshot(collection(db, LB), snapshot => {
-    const entries = [];
-    snapshot.forEach(d => entries.push(d.data()));
-    renderLeaderboardFromEntries(entries);
-    recalcLeaderboardScores(entries);
-  });
-}
-
 // ===================== FLAGS =====================
 const FLAGS = {
   "Mexico":                 "flags/mx.svg",
@@ -94,28 +67,43 @@ const REVERSE_MAP = {
   "Qatar": "Qatar", "Switzerland": "Switzerland", "Brazil": "Brazil", "Morocco": "Morocco",
   "Haiti": "Haiti", "Scotland": "Scotland", "Paraguay": "Paraguay", "Australia": "Australia",
   "Türkiye": "Türkiye", "Turkey": "Türkiye",
-  "Germany": "Germany",
-  "Curaçao": "Curaçao", "Curacao": "Curaçao",
+  "Germany": "Germany", "Curaçao": "Curaçao", "Curacao": "Curaçao",
   "Ivory Coast": "Ivory Coast", "Côte d'Ivoire": "Ivory Coast", "Cote d'Ivoire": "Ivory Coast",
-  "Ecuador": "Ecuador",
-  "Netherlands": "Netherlands", "Holland": "Netherlands",
-  "Japan": "Japan", "Sweden": "Sweden", "Tunisia": "Tunisia", "Belgium": "Belgium",
-  "Egypt": "Egypt",
+  "Ecuador": "Ecuador", "Netherlands": "Netherlands", "Holland": "Netherlands",
+  "Japan": "Japan", "Sweden": "Sweden", "Tunisia": "Tunisia", "Belgium": "Belgium", "Egypt": "Egypt",
   "Iran": "Iran", "IR Iran": "Iran", "Islamic Republic of Iran": "Iran",
-  "Iran (Islamic Republic of)": "Iran",
-  "New Zealand": "New Zealand",
-  "Spain": "Spain",
+  "New Zealand": "New Zealand", "Spain": "Spain",
   "Cape Verde": "Cape Verde", "Cabo Verde": "Cape Verde", "Cape Verde Islands": "Cape Verde",
   "Saudi Arabia": "Saudi Arabia", "Uruguay": "Uruguay", "France": "France",
   "Senegal": "Senegal", "Iraq": "Iraq", "Norway": "Norway", "Argentina": "Argentina",
   "Algeria": "Algeria", "Austria": "Austria", "Jordan": "Jordan", "Portugal": "Portugal",
-  "Congo DR": "Congo DR", "DR Congo": "Congo DR",
-  "Democratic Republic of Congo": "Congo DR",
+  "Congo DR": "Congo DR", "DR Congo": "Congo DR", "Democratic Republic of Congo": "Congo DR",
   "Democratic Republic of the Congo": "Congo DR",
-  "Congo, The Democratic Republic of the": "Congo DR",
   "Uzbekistan": "Uzbekistan", "Colombia": "Colombia", "England": "England",
   "Croatia": "Croatia", "Ghana": "Ghana", "Panama": "Panama", "South Africa": "South Africa",
 };
+
+// ===================== FIREBASE HELPERS =====================
+const LB = "leaderboard2026";
+
+function getDB()         { return window._db; }
+function fbCollection(db, col) { return window._collection(db, col); }
+function fbDoc(db, col, id)    { return window._doc(db, col, id); }
+function fbSetDoc(ref, data)   { return window._setDoc(ref, data); }
+function fbDeleteDoc(ref)      { return window._deleteDoc(ref); }
+function fbOnSnapshot(ref, cb) { return window._onSnapshot(ref, cb); }
+function fbGetDocs(ref)        { return window._getDocs(ref); }
+
+function initLeaderboardListener() {
+  const db = getDB();
+  if (!db) { console.warn("Firebase not ready"); return; }
+  fbOnSnapshot(fbCollection(db, LB), snapshot => {
+    const entries = [];
+    snapshot.forEach(d => entries.push(d.data()));
+    renderLeaderboardFromEntries(entries);
+    recalcLeaderboardScores(entries);
+  });
+}
 
 // ===================== POINTS =====================
 const POINTS = { group: 1, third_pool: 1, r32: 2, r16: 4, qf: 8, sf: 16, third: 16, final: 32 };
@@ -271,12 +259,10 @@ function recalcPoints() {
     if (gp.first  && state.liveResults.groupAdvanced.includes(gp.first))  picks.group++;
     if (gp.second && state.liveResults.groupAdvanced.includes(gp.second)) picks.group++;
   });
-
   picks.third_pool = 0;
   (state.bestThird||[]).forEach(team => {
     if (state.liveResults.groupAdvanced.includes(team)) picks.third_pool++;
   });
-
   [
     { key:"r32", winners:state.liveResults.r32Winners, pickObj:state.r32Picks },
     { key:"r16", winners:state.liveResults.r16Winners, pickObj:state.r16Picks },
@@ -288,7 +274,6 @@ function recalcPoints() {
       if (team && winners.includes(team)) picks[key]++;
     });
   });
-
   picks.third = (state.thirdPick && state.liveResults.thirdPlace===state.thirdPick) ? 1 : 0;
   picks.final = (state.finalPick && state.liveResults.champion===state.finalPick)   ? 1 : 0;
 
@@ -338,16 +323,14 @@ function updateCompletion() {
   document.getElementById("completionPct").textContent = pct+"%";
   document.getElementById("completionBar").style.width = pct+"%";
 
-  const labels = [
-    [0,  0,   "Start picking your group stage teams!"],
-    [1,  29,  "Good start — keep picking! 👊"],
-    [30, 59,  "You're halfway there 🔥"],
-    [60, 89,  "Almost done — finish the bracket! ⚡"],
-    [90, 99,  "So close! Pick your champion 🏆"],
-    [100,100, "Bracket complete! You're ready 🎉"],
-  ];
-  const label = labels.find(([min,max]) => pct>=min && pct<=max);
-  document.getElementById("completionLabel").textContent = label ? label[2] : "";
+  let label = "Start picking your group stage teams!";
+  if (pct>0   && pct<30)  label = "Good start — keep picking! 👊";
+  if (pct>=30 && pct<60)  label = "You're halfway there 🔥";
+  if (pct>=60 && pct<90)  label = "Almost done — finish the bracket! ⚡";
+  if (pct>=90 && pct<100) label = "So close! Pick your champion 🏆";
+  if (pct===100)           label = "Bracket complete! You're ready 🎉";
+
+  document.getElementById("completionLabel").textContent = label;
   if (pct===100) updateRating();
 }
 
@@ -387,7 +370,7 @@ function updateRating() {
   document.getElementById("ratingUpsets").textContent = `${upsets} upset pick${upsets!==1?"s":""}`;
 }
 
-// ===================== LEADERBOARD (Firebase) =====================
+// ===================== LEADERBOARD =====================
 async function saveBracketEntry() {
   const input = document.getElementById("playerName");
   const name  = input.value.trim();
@@ -399,12 +382,15 @@ async function saveBracketEntry() {
   });
   if (!allGroupsDone) { showToast("⚠️ Finish your group picks first!"); return; }
 
+  const db = getDB();
+  if (!db) { showToast("⚠️ Database not ready — try again"); return; }
+
   const btn = document.querySelector(".btn-gold");
   if (btn) { btn.textContent="💾 Saving..."; btn.disabled=true; }
 
   try {
     const docId = name.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
-    await setDoc(doc(db, LB, docId), {
+    await fbSetDoc(fbDoc(db, LB, docId), {
       name,
       points:   state.totalPoints,
       champion: state.finalPick||"TBD",
@@ -423,9 +409,11 @@ async function saveBracketEntry() {
 
 async function deleteEntry(name) {
   if (!confirm(`Remove ${name} from the leaderboard?`)) return;
+  const db = getDB();
+  if (!db) return;
   try {
     const docId = name.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
-    await deleteDoc(doc(db, LB, docId));
+    await fbDeleteDoc(fbDoc(db, LB, docId));
     showToast(`🗑️ Removed ${name}`);
   } catch(e) {
     console.error("Firebase delete error:", e);
@@ -433,7 +421,7 @@ async function deleteEntry(name) {
   }
 }
 
-function renderLeaderboard() {} // driven by Firebase listener
+function renderLeaderboard() {}
 
 function renderLeaderboardFromEntries(entries) {
   const el = document.getElementById("leaderboard");
@@ -459,10 +447,9 @@ function renderLeaderboardFromEntries(entries) {
   `).join("");
 }
 
-// Recalculate all leaderboard scores using current live results
-// and update Firebase if any score changed
 async function recalcLeaderboardScores(entries) {
-  if (!entries.length || !state.liveResults.groupAdvanced.length) return;
+  const db = getDB();
+  if (!db || !entries.length || !state.liveResults.groupAdvanced.length) return;
   const updates = [];
   entries.forEach(entry => {
     if (!entry.bracket) return;
@@ -471,13 +458,13 @@ async function recalcLeaderboardScores(entries) {
       const pts = calcScore(s, state.liveResults);
       if (entry.points !== pts) {
         const docId = entry.name.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"");
-        updates.push(setDoc(doc(db, LB, docId), { ...entry, points: pts }));
+        updates.push(fbSetDoc(fbDoc(db, LB, docId), { ...entry, points: pts }));
       }
-    } catch(e) { console.warn("Recalc failed for:", entry.name, e); }
+    } catch(e) { console.warn("Recalc failed:", entry.name, e); }
   });
   if (updates.length) {
     await Promise.all(updates);
-    console.log(`✅ Updated ${updates.length} leaderboard scores`);
+    console.log(`✅ Updated ${updates.length} scores`);
   }
 }
 
@@ -525,7 +512,6 @@ async function fetchLiveResults() {
     const data    = await res.json();
     const matches = data.matches||[];
 
-    // Debug logs — helpful on June 11
     console.log("📡 Stages:", [...new Set(matches.map(m=>m.stage))]);
     console.log("📡 Teams:", [...new Set(matches.flatMap(m=>[m.homeTeam?.name,m.awayTeam?.name]))].filter(Boolean));
 
@@ -550,11 +536,11 @@ async function fetchLiveResults() {
       const winner = hs>as_?home:as_>hs?away:null;
       const stage  = m.stage;
 
-      if (stage==="ROUND_OF_32"    && winner && !state.liveResults.r32Winners.includes(winner)) state.liveResults.r32Winners.push(winner);
-      if (stage==="ROUND_OF_16"    && winner && !state.liveResults.r16Winners.includes(winner)) state.liveResults.r16Winners.push(winner);
+      if (stage==="ROUND_OF_32" && winner && !state.liveResults.r32Winners.includes(winner)) state.liveResults.r32Winners.push(winner);
+      if (stage==="ROUND_OF_16" && winner && !state.liveResults.r16Winners.includes(winner)) state.liveResults.r16Winners.push(winner);
       if ((stage==="QUARTER_FINALS"||stage==="QUARTER_FINAL") && winner && !state.liveResults.qfWinners.includes(winner)) state.liveResults.qfWinners.push(winner);
-      if ((stage==="SEMI_FINALS"   ||stage==="SEMI_FINAL")    && winner && !state.liveResults.sfWinners.includes(winner)) state.liveResults.sfWinners.push(winner);
-      if ((stage==="THIRD_PLACE"   ||stage==="THIRD_PLACE_MATCH"||stage==="PLAY_OFF_ROUND") && winner) state.liveResults.thirdPlace=winner;
+      if ((stage==="SEMI_FINALS"||stage==="SEMI_FINAL") && winner && !state.liveResults.sfWinners.includes(winner)) state.liveResults.sfWinners.push(winner);
+      if ((stage==="THIRD_PLACE"||stage==="THIRD_PLACE_MATCH"||stage==="PLAY_OFF_ROUND") && winner) state.liveResults.thirdPlace=winner;
       if (stage==="FINAL" && winner) state.liveResults.champion=winner;
 
       if (stage==="GROUP_STAGE") {
@@ -571,9 +557,9 @@ async function fetchLiveResults() {
         s[home].played++; s[away].played++;
         s[home].gf+=hs; s[away].gf+=as_;
         s[home].gd+=(hs-as_); s[away].gd+=(as_-hs);
-        if (hs>as_)       { s[home].pts+=3; }
-        else if (as_>hs)  { s[away].pts+=3; }
-        else              { s[home].pts+=1; s[away].pts+=1; }
+        if (hs>as_)      { s[home].pts+=3; }
+        else if (as_>hs) { s[away].pts+=3; }
+        else             { s[home].pts+=1; s[away].pts+=1; }
       }
     });
 
@@ -602,10 +588,10 @@ async function fetchLiveResults() {
       });
     }
 
-    const r32c = done.filter(m=>m.stage==="ROUND_OF_32").length;
-    const r16c = done.filter(m=>m.stage==="ROUND_OF_16").length;
-    const qfc  = done.filter(m=>m.stage==="QUARTER_FINALS"||m.stage==="QUARTER_FINAL").length;
-    const sfc  = done.filter(m=>m.stage==="SEMI_FINALS"   ||m.stage==="SEMI_FINAL").length;
+    const r32c=done.filter(m=>m.stage==="ROUND_OF_32").length;
+    const r16c=done.filter(m=>m.stage==="ROUND_OF_16").length;
+    const qfc =done.filter(m=>m.stage==="QUARTER_FINALS"||m.stage==="QUARTER_FINAL").length;
+    const sfc =done.filter(m=>m.stage==="SEMI_FINALS"   ||m.stage==="SEMI_FINAL").length;
     const allGDone = Object.keys(standings).length===12 &&
       Object.values(standings).every(g=>Object.values(g).every(s=>s.played===3));
 
@@ -729,7 +715,7 @@ function renderThirdPlacePool() {
   document.getElementById("thirdPoolCount").textContent=(state.bestThird||[]).length;
 
   thirdTeams.forEach(({name,group})=>{
-    const isSel=( state.bestThird||[]).includes(name);
+    const isSel=(state.bestThird||[]).includes(name);
     const isAdv=state.liveResults.groupAdvanced.includes(name);
     const card=document.createElement("div");
     card.className=`third-pool-card ${isSel?"selected":""}`;
@@ -1040,8 +1026,12 @@ if (state.finalPick) {
   renderChampion(state.finalPick);
 }
 
-// Start Firebase leaderboard listener (real-time)
-initLeaderboardListener();
+// Init Firebase listener when ready
+window.addEventListener("firebaseReady", () => {
+  console.log("✅ Firebase ready!");
+  initLeaderboardListener();
+});
+if (window._db) initLeaderboardListener();
 
 fetchLiveResults();
 setInterval(fetchLiveResults, 60000);

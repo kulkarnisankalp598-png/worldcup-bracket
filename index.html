@@ -200,8 +200,40 @@
 
   <div id="toast" class="toast"></div>
 
+  <!-- SCRIPTS -->
   <script src="config.js"></script>
   <script src="data.js"></script>
+
+  <!-- Firebase via CDN as module -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc, getDocs }
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey:            "AIzaSyAaoIzoRf6MuTAVgX6glWv_wfZunZAT27M",
+      authDomain:        "worldcup-bracket-2026.firebaseapp.com",
+      projectId:         "worldcup-bracket-2026",
+      storageBucket:     "worldcup-bracket-2026.firebasestorage.app",
+      messagingSenderId: "533452162141",
+      appId:             "1:533452162141:web:85b6c9c704f6b7970679b4"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const db          = getFirestore(firebaseApp);
+
+    // Expose to global scope for app.js
+    window._db          = db;
+    window._collection  = collection;
+    window._doc         = doc;
+    window._setDoc      = setDoc;
+    window._onSnapshot  = onSnapshot;
+    window._deleteDoc   = deleteDoc;
+    window._getDocs     = getDocs;
+
+    window.dispatchEvent(new Event("firebaseReady"));
+  </script>
+
   <script src="app.js"></script>
 </body>
 </html>
