@@ -1,3 +1,6 @@
+// ===================== TOURNAMENT LOCK DATE =====================
+const TOURNAMENT_STARTED = new Date() >= new Date("2026-06-11T13:00:00-06:00");
+
 // ===================== FLAGS =====================
 const FLAGS = {
   "Mexico":                 "flags/mx.svg",
@@ -86,7 +89,7 @@ const REVERSE_MAP = {
 // ===================== FIREBASE HELPERS =====================
 const LB = "leaderboard2026";
 
-function getDB()         { return window._db; }
+function getDB()               { return window._db; }
 function fbCollection(db, col) { return window._collection(db, col); }
 function fbDoc(db, col, id)    { return window._doc(db, col, id); }
 function fbSetDoc(ref, data)   { return window._setDoc(ref, data); }
@@ -372,6 +375,8 @@ function updateRating() {
 
 // ===================== LEADERBOARD =====================
 async function saveBracketEntry() {
+  if (TOURNAMENT_STARTED) { showToast("🔒 Tournament has started — brackets are locked!"); return; }
+
   const input = document.getElementById("playerName");
   const name  = input.value.trim();
   if (!name) { showToast("⚠️ Enter your name first!"); return; }
@@ -398,6 +403,7 @@ async function saveBracketEntry() {
       bracket:  btoa(unescape(encodeURIComponent(JSON.stringify(state)))),
     });
     showToast(`🎉 ${name} saved to leaderboard!`);
+    localStorage.setItem("wc2026_myname", name);
     input.value = "";
   } catch(e) {
     console.error("Firebase save error:", e);
@@ -408,6 +414,7 @@ async function saveBracketEntry() {
 }
 
 async function deleteEntry(name) {
+  if (TOURNAMENT_STARTED) { showToast("🔒 Tournament has started — brackets are locked!"); return; }
   if (!confirm(`Remove ${name} from the leaderboard?`)) return;
   const db = getDB();
   if (!db) return;
@@ -429,9 +436,11 @@ function renderLeaderboardFromEntries(entries) {
     el.innerHTML = `<div class="leaderboard-empty">No entries yet — be the first! 👆</div>`;
     return;
   }
-  entries.sort((a,b) => b.points-a.points);
+  entries.sort((a, b) => b.points - a.points);
   const medals = ["🥇","🥈","🥉"];
-  el.innerHTML = entries.map((e,i) => `
+  const myName = localStorage.getItem("wc2026_myname") || "";
+
+  el.innerHTML = entries.map((e, i) => `
     <div class="leaderboard-row ${i===0?"first":""}">
       <span class="lb-rank">${medals[i]||"#"+(i+1)}</span>
       <span class="lb-name">${e.name}</span>
@@ -442,14 +451,16 @@ function renderLeaderboardFromEntries(entries) {
       </span>
       <span class="lb-pts">${e.points} pts</span>
       <span class="lb-date">${e.savedAt}</span>
-      <button class="lb-delete" onclick="deleteEntry('${e.name}')">✕</button>
+      ${!TOURNAMENT_STARTED && myName.toLowerCase()===e.name.toLowerCase()
+        ? `<button class="lb-delete" onclick="deleteEntry('${e.name}')">✕</button>`
+        : '<span style="width:24px"></span>'}
     </div>
   `).join("");
 }
 
 async function recalcLeaderboardScores(entries) {
   const db = getDB();
-  if (!db || !entries.length || !state.liveResults.groupAdvanced.length) return;
+  if (!db||!entries.length||!state.liveResults.groupAdvanced.length) return;
   const updates = [];
   entries.forEach(entry => {
     if (!entry.bracket) return;
@@ -626,7 +637,7 @@ async function fetchLiveResults() {
 function renderGroups() {
   const grid=document.getElementById("groupsGrid");
   grid.innerHTML="";
-  const isLocked=state.locked.group;
+  const isLocked=state.locked.group || TOURNAMENT_STARTED;
 
   Object.entries(GROUPS).forEach(([letter,teams])=>{
     const gp=state.groupPicks[letter]||{};
@@ -677,6 +688,7 @@ function renderGroups() {
 }
 
 function cycleGroupPick(letter, teamName) {
+  if (state.locked.group || TOURNAMENT_STARTED) return;
   if (!state.groupPicks[letter]) state.groupPicks[letter]={};
   const gp=state.groupPicks[letter];
   const pos=gp.first===teamName?1:gp.second===teamName?2:gp.third===teamName?3:0;
@@ -726,7 +738,7 @@ function renderThirdPlacePool() {
       ${isSel?'<span class="pos-badge">✓</span>':""}
       ${isSel&&isAdv?'<span class="live-badge correct" style="margin-left:4px">+1</span>':""}
     `;
-    card.addEventListener("click",()=>toggleBestThird(name));
+    if (!TOURNAMENT_STARTED) card.addEventListener("click",()=>toggleBestThird(name));
     grid.appendChild(card);
   });
 
@@ -737,6 +749,7 @@ function renderThirdPlacePool() {
 }
 
 function toggleBestThird(teamName) {
+  if (TOURNAMENT_STARTED) { showToast("🔒 Tournament has started — brackets are locked!"); return; }
   if (!state.bestThird) state.bestThird=[];
   const idx=state.bestThird.indexOf(teamName);
   if (idx!==-1) {
@@ -781,6 +794,7 @@ function renderTeamSlot(teamName, key, matchIdx, winners, isLocked, pts) {
   const isWinner=teamName&&winners.includes(teamName);
   const isCorrect=isSelected&&isWinner;
   const isWrong=isSelected&&isLocked&&!isWinner&&winners.length>0;
+  const locked=isLocked||TOURNAMENT_STARTED;
 
   const div=document.createElement("div");
   div.className="match-team"
@@ -794,10 +808,10 @@ function renderTeamSlot(teamName, key, matchIdx, winners, isLocked, pts) {
     <span class="team-name">${teamName||"TBD"}</span>
     ${isCorrect?`<span class="live-badge correct" style="margin-left:auto">+${pts}</span>`:""}
     ${isWrong?'<span class="live-badge elim" style="margin-left:auto">✗</span>':""}
-    ${isSelected&&!isLocked&&!isCorrect&&!isWrong?'<span class="check-icon" style="margin-left:auto">✓</span>':""}
+    ${isSelected&&!locked&&!isCorrect&&!isWrong?'<span class="check-icon" style="margin-left:auto">✓</span>':""}
   `;
 
-  if (!isTBD&&!isLocked) {
+  if (!isTBD&&!locked) {
     div.addEventListener("click",()=>{
       if (!state[key]) state[key]={};
       state[key][matchIdx]=teamName;
@@ -826,7 +840,7 @@ function renderKnockout() {
 
   rounds.forEach(({key,lockKey,label,matchups,winners,pts})=>{
     if (!matchups.some(m=>m.team1||m.team2)) return;
-    const isLocked=state.locked[lockKey];
+    const isLocked=state.locked[lockKey]||TOURNAMENT_STARTED;
     const roundDiv=document.createElement("div");
     roundDiv.innerHTML=`
       <div class="round-label">
@@ -869,7 +883,7 @@ function renderThirdPlace() {
     el.innerHTML=`<p class="section-hint">Finish both semifinal picks to unlock 3rd place.</p>`;
     return;
   }
-  const isLocked=state.locked.sf;
+  const isLocked=state.locked.sf||TOURNAMENT_STARTED;
   const realThird=state.liveResults.thirdPlace;
   el.innerHTML=`
     <p class="section-hint" style="margin-bottom:16px">Pick the 3rd place winner — +16 pts!</p>
@@ -898,6 +912,7 @@ function renderThirdPlace() {
 }
 
 function pickThird(teamName) {
+  if (TOURNAMENT_STARTED) { showToast("🔒 Tournament has started — brackets are locked!"); return; }
   state.thirdPick=teamName;
   showToast(`🥉 ${teamName} — 3rd place!`);
   saveState(); recalcPoints(); renderThirdPlace();
@@ -911,7 +926,7 @@ function renderFinal() {
     el.innerHTML=`<p class="section-hint">Finish both semifinal picks to unlock the final.</p>`;
     return;
   }
-  const isLocked=state.locked.final;
+  const isLocked=state.locked.final||TOURNAMENT_STARTED;
   const realChamp=state.liveResults.champion;
   el.innerHTML=`
     <p class="section-hint" style="margin-bottom:16px">Pick the World Cup Champion — +32 pts!</p>
@@ -939,6 +954,7 @@ function renderFinal() {
 }
 
 function pickChampion(teamName) {
+  if (TOURNAMENT_STARTED) { showToast("🔒 Tournament has started — brackets are locked!"); return; }
   state.finalPick=teamName;
   document.getElementById("championSection").classList.remove("hidden");
   renderChampion(teamName);
@@ -961,6 +977,7 @@ function renderChampion(teamName) {
 
 // ===================== RESET =====================
 function resetBracket() {
+  if (TOURNAMENT_STARTED) { showToast("🔒 Tournament has started — brackets are locked!"); return; }
   if (!confirm("Reset your entire bracket? This cannot be undone.")) return;
   localStorage.removeItem("wc2026_state");
   state={
@@ -1026,8 +1043,7 @@ if (state.finalPick) {
   renderChampion(state.finalPick);
 }
 
-// Init Firebase listener when ready
-window.addEventListener("firebaseReady", () => {
+window.addEventListener("firebaseReady",()=>{
   console.log("✅ Firebase ready!");
   initLeaderboardListener();
 });
