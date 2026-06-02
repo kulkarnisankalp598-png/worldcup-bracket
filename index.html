@@ -11,7 +11,6 @@
 <body>
   <div class="pitch-bg"></div>
 
-  <!-- LIVE MATCH STRIP -->
   <div id="liveStrip" class="live-strip">
     <div class="live-strip-inner">
       <span class="live-dot">🔴 LIVE</span>
@@ -39,7 +38,6 @@
 
   <main>
 
-    <!-- COMPLETION METER -->
     <section class="completion-section">
       <div class="completion-header">
         <h2 class="section-title">BRACKET PROGRESS</h2>
@@ -51,36 +49,22 @@
       <p id="completionLabel" class="completion-label">Start picking your group stage teams!</p>
     </section>
 
-    <!-- BRACKET RATING -->
     <section id="ratingSection" class="rating-section hidden">
       <h2 class="section-title">BRACKET STRENGTH</h2>
       <div class="rating-card">
         <div class="rating-grade" id="ratingGrade">—</div>
         <div class="rating-details">
-          <div class="rating-row">
-            <span class="rating-label">Risk Level</span>
-            <span id="ratingRisk" class="rating-value">—</span>
-          </div>
-          <div class="rating-row">
-            <span class="rating-label">Boldest Pick</span>
-            <span id="ratingBold" class="rating-value">—</span>
-          </div>
-          <div class="rating-row">
-            <span class="rating-label">Safest Pick</span>
-            <span id="ratingSafe" class="rating-value">—</span>
-          </div>
-          <div class="rating-row">
-            <span class="rating-label">Upset Count</span>
-            <span id="ratingUpsets" class="rating-value">—</span>
-          </div>
+          <div class="rating-row"><span class="rating-label">Risk Level</span><span id="ratingRisk" class="rating-value">—</span></div>
+          <div class="rating-row"><span class="rating-label">Boldest Pick</span><span id="ratingBold" class="rating-value">—</span></div>
+          <div class="rating-row"><span class="rating-label">Safest Pick</span><span id="ratingSafe" class="rating-value">—</span></div>
+          <div class="rating-row"><span class="rating-label">Upset Count</span><span id="ratingUpsets" class="rating-value">—</span></div>
         </div>
       </div>
     </section>
 
-    <!-- FRIEND LEADERBOARD -->
     <section class="leaderboard-section">
       <h2 class="section-title">🏆 FRIEND LEADERBOARD</h2>
-      <p class="section-hint">Save your bracket to compete with friends on this device. Scores update automatically as results come in — no need to re-save! 🔄</p>
+      <p class="section-hint">Save your bracket to compete with friends. Scores update automatically — no need to re-save! 🔄</p>
       <div class="leaderboard-submit">
         <input id="playerName" type="text" class="name-input" placeholder="Enter your name..." maxlength="20" />
         <button onclick="saveBracketEntry()" class="btn btn-gold">💾 Save My Bracket</button>
@@ -88,98 +72,44 @@
       <div id="leaderboard" class="leaderboard-list"></div>
     </section>
 
-    <!-- SCORE BREAKDOWN -->
     <section class="score-breakdown-section">
       <h2 class="section-title">YOUR SCORE BREAKDOWN</h2>
       <div id="scoreBreakdown" class="score-breakdown"></div>
     </section>
 
-    <!-- SCORING INFO -->
     <section class="scoring-guide">
       <h2 class="section-title">HOW POINTS WORK</h2>
       <div class="scoring-cards">
-        <div class="score-card">
-          <span class="score-emoji">🥇</span>
-          <span class="score-label">1st Place Pick</span>
-          <span class="score-pts">+1 pt</span>
-        </div>
-        <div class="score-card">
-          <span class="score-emoji">🥈</span>
-          <span class="score-label">2nd Place Pick</span>
-          <span class="score-pts">+1 pt</span>
-        </div>
-        <div class="score-card">
-          <span class="score-emoji">🥉</span>
-          <span class="score-label">3rd Place Pool</span>
-          <span class="score-pts">+1 pt</span>
-        </div>
-        <div class="score-card">
-          <span class="score-emoji">⚡</span>
-          <span class="score-label">Round of 32</span>
-          <span class="score-pts">+2 pts</span>
-        </div>
-        <div class="score-card">
-          <span class="score-emoji">🔥</span>
-          <span class="score-label">Round of 16</span>
-          <span class="score-pts">+4 pts</span>
-        </div>
-        <div class="score-card">
-          <span class="score-emoji">💎</span>
-          <span class="score-label">Quarterfinal</span>
-          <span class="score-pts">+8 pts</span>
-        </div>
-        <div class="score-card">
-          <span class="score-emoji">👑</span>
-          <span class="score-label">Semifinal</span>
-          <span class="score-pts">+16 pts</span>
-        </div>
-        <div class="score-card">
-          <span class="score-emoji">🎖️</span>
-          <span class="score-label">3rd Place Match</span>
-          <span class="score-pts">+16 pts</span>
-        </div>
-        <div class="score-card gold">
-          <span class="score-emoji">🏆</span>
-          <span class="score-label">Champion</span>
-          <span class="score-pts">+32 pts</span>
-        </div>
+        <div class="score-card"><span class="score-emoji">🥇</span><span class="score-label">1st Place Pick</span><span class="score-pts">+1 pt</span></div>
+        <div class="score-card"><span class="score-emoji">🥈</span><span class="score-label">2nd Place Pick</span><span class="score-pts">+1 pt</span></div>
+        <div class="score-card"><span class="score-emoji">🥉</span><span class="score-label">3rd Place Pool</span><span class="score-pts">+1 pt</span></div>
+        <div class="score-card"><span class="score-emoji">⚡</span><span class="score-label">Round of 32</span><span class="score-pts">+2 pts</span></div>
+        <div class="score-card"><span class="score-emoji">🔥</span><span class="score-label">Round of 16</span><span class="score-pts">+4 pts</span></div>
+        <div class="score-card"><span class="score-emoji">💎</span><span class="score-label">Quarterfinal</span><span class="score-pts">+8 pts</span></div>
+        <div class="score-card"><span class="score-emoji">👑</span><span class="score-label">Semifinal</span><span class="score-pts">+16 pts</span></div>
+        <div class="score-card"><span class="score-emoji">🎖️</span><span class="score-label">3rd Place Match</span><span class="score-pts">+16 pts</span></div>
+        <div class="score-card gold"><span class="score-emoji">🏆</span><span class="score-label">Champion</span><span class="score-pts">+32 pts</span></div>
       </div>
     </section>
 
-    <!-- GROUP STAGE -->
     <section id="groupStage">
       <h2 class="section-title">GROUP STAGE</h2>
-      <p class="section-hint">Click teams to rank them: 1st click = 🥇 1st place &nbsp;·&nbsp; 2nd click = 🥈 2nd place &nbsp;·&nbsp; 3rd click = 🥉 3rd place &nbsp;·&nbsp; Click again to remove.</p>
+      <p class="section-hint">Click teams to rank them: 1st click = 🥇 · 2nd click = 🥈 · 3rd click = 🥉 · Click again to remove.</p>
       <div id="groupsGrid" class="groups-grid"></div>
     </section>
 
-    <!-- BEST 3RD PLACE PICKER -->
     <section id="thirdPlacePool" class="hidden">
       <h2 class="section-title">PICK 8 BEST 3RD PLACE TEAMS</h2>
       <p class="section-hint">These 8 teams join the Round of 32. &nbsp;<span id="thirdPoolCount">0</span>/8 selected.</p>
       <div id="thirdPlacePoolGrid" class="third-pool-grid"></div>
     </section>
 
-    <!-- KNOCKOUT BRACKET -->
     <section id="knockoutSection" class="hidden">
       <h2 class="section-title">KNOCKOUT BRACKET</h2>
-      <p class="section-hint">Pick the winner of each match to advance them.</p>
-      <div id="knockoutBracket" class="knockout-bracket"></div>
+      <p class="section-hint">Pick winners by clicking teams. Scroll sideways to see the full bracket →</p>
+      <div id="knockoutBracket"></div>
     </section>
 
-    <!-- 3RD PLACE MATCH -->
-    <section id="thirdPlaceSection" class="hidden">
-      <h2 class="section-title">🥉 3RD PLACE MATCH</h2>
-      <div id="thirdPlaceDisplay"></div>
-    </section>
-
-    <!-- FINAL -->
-    <section id="finalSection" class="hidden">
-      <h2 class="section-title">🏆 THE FINAL</h2>
-      <div id="finalDisplay"></div>
-    </section>
-
-    <!-- CHAMPION -->
     <section id="championSection" class="hidden">
       <h2 class="section-title">🎉 YOUR CHAMPION</h2>
       <div id="championDisplay" class="champion-display"></div>
@@ -187,7 +117,6 @@
 
   </main>
 
-  <!-- TEAM DETAIL MODAL -->
   <div id="teamModal" class="modal-overlay hidden">
     <div class="modal-card">
       <button class="modal-close" onclick="closeModal()">✕</button>
@@ -195,16 +124,12 @@
     </div>
   </div>
 
-  <!-- CONFETTI CANVAS -->
   <canvas id="confettiCanvas"></canvas>
-
   <div id="toast" class="toast"></div>
 
-  <!-- SCRIPTS -->
   <script src="config.js"></script>
   <script src="data.js"></script>
 
-  <!-- Firebase via CDN as module -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc, getDocs }
@@ -219,10 +144,9 @@
       appId:             "1:533452162141:web:85b6c9c704f6b7970679b4"
     };
 
-    const firebaseApp = initializeApp(firebaseConfig);
-    const db          = getFirestore(firebaseApp);
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
 
-    // Expose to global scope for app.js
     window._db          = db;
     window._collection  = collection;
     window._doc         = doc;
