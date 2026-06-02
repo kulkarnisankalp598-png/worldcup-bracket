@@ -59,6 +59,12 @@ function flagImg(teamName, shape = "rect") {
   return `<img class="flag flag-${shape}" src="${src}" alt="${teamName}">`;
 }
 
+function bvFlagImg(teamName) {
+  const src = FLAGS[teamName];
+  if (!src) return `<div class="bv-flag-placeholder"></div>`;
+  return `<img class="bv-flag" src="${src}" alt="${teamName}">`;
+}
+
 // ===================== API NAME MAP =====================
 const REVERSE_MAP = {
   "United States": "USA", "United States of America": "USA", "USA": "USA",
@@ -226,120 +232,248 @@ document.getElementById("teamModal").addEventListener("click", e => {
   if (e.target===document.getElementById("teamModal")) closeModal();
 });
 
-// ===================== BRACKET VIEWER =====================
-function viewBracket(entryJson) {
-  const entry = typeof entryJson === "string" ? JSON.parse(entryJson) : entryJson;
-  if (!entry.bracket) { showToast("⚠️ No bracket data saved"); return; }
+// ===================== VISUAL BRACKET RENDERER =====================
+function buildBracketVisual(s, liveResults, isReadOnly, container) {
+  // Build match arrays from state
+  const gp = s.groupPicks || {};
+  const g  = l => gp[l] || {};
+  const bt = s.bestThird || [];
 
-  let s;
-  try {
-    s = JSON.parse(decodeURIComponent(escape(atob(entry.bracket))));
-  } catch(e) { showToast("⚠️ Could not load bracket"); return; }
+  const r32Matchups = [
+    [g("A").first, g("B").second], [g("C").first, g("D").second],
+    [g("E").first, g("F").second], [g("G").first, g("H").second],
+    [g("I").first, g("J").second], [g("K").first, g("L").second],
+    [g("B").first, g("A").second], [g("D").first, g("C").second],
+    [g("F").first, g("E").second], [g("H").first, g("G").second],
+    [g("J").first, g("I").second], [g("L").first, g("K").second],
+    [bt[0]||null, bt[1]||null], [bt[2]||null, bt[3]||null],
+    [bt[4]||null, bt[5]||null], [bt[6]||null, bt[7]||null],
+  ];
 
-  const existing = document.getElementById("bracketViewerModal");
-  if (existing) existing.remove();
+  const r16Matchups = [];
+  for (let i=0;i<16;i+=2) r16Matchups.push([(s.r32Picks||{})[i]||null,(s.r32Picks||{})[i+1]||null]);
 
-  const overlay = document.createElement("div");
-  overlay.className = "bracket-modal-overlay";
-  overlay.id = "bracketViewerModal";
+  const qfMatchups = [];
+  for (let i=0;i<8;i+=2)  qfMatchups.push([(s.r16Picks||{})[i]||null,(s.r16Picks||{})[i+1]||null]);
 
-  const groupRows = Object.entries(s.groupPicks||{}).map(([letter, gp]) => {
-    if (!gp || Array.isArray(gp)) return "";
-    return `
-      <div class="bracket-viewer-group">
-        <div class="bracket-viewer-group-label">GROUP ${letter}</div>
-        ${gp.first  ? `<div class="bracket-viewer-team">${flagImg(gp.first,"circle")} 🥇 ${gp.first}</div>`   : ""}
-        ${gp.second ? `<div class="bracket-viewer-team">${flagImg(gp.second,"circle")} 🥈 ${gp.second}</div>` : ""}
-        ${gp.third  ? `<div class="bracket-viewer-team">${flagImg(gp.third,"circle")} 🥉 ${gp.third}</div>`   : ""}
-      </div>
-    `;
-  }).join("");
+  const sfMatchups = [];
+  for (let i=0;i<4;i+=2)  sfMatchups.push([(s.qfPicks||{})[i]||null,(s.qfPicks||{})[i+1]||null]);
 
-  const knockoutRows = [
-    { label: "Round of 32",   picks: s.r32Picks||{}, pts: "+2" },
-    { label: "Round of 16",   picks: s.r16Picks||{}, pts: "+4" },
-    { label: "Quarterfinals", picks: s.qfPicks||{},  pts: "+8" },
-    { label: "Semifinals",    picks: s.sfPicks||{},  pts: "+16" },
-  ].map(({ label, picks, pts }) => {
-    const teams = Object.values(picks).filter(Boolean);
-    if (!teams.length) return "";
-    return `
-      <div class="bracket-viewer-section">
-        <div class="bracket-viewer-section-title">${label}</div>
-        <div class="bracket-viewer-picks">
-          ${teams.map(t => `
-            <div class="bracket-viewer-pick">
-              ${flagImg(t,"circle")}
-              <span style="flex:1">${t}</span>
-              <span style="color:var(--gold);font-size:0.75rem">${pts} pts</span>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-    `;
-  }).join("");
+  const finMatchup = [(s.sfPicks||{})[0]||null, (s.sfPicks||{})[1]||null];
+  const champion   = s.finalPick || null;
 
-  overlay.innerHTML = `
-    <div class="bracket-modal-card">
-      <button class="modal-close" onclick="document.getElementById('bracketViewerModal').remove()">✕</button>
-      <div class="bracket-viewer-header">
-        <div class="bracket-viewer-name">${entry.name}'s Bracket</div>
-        <div class="bracket-viewer-pts">${entry.points} pts</div>
-      </div>
+  const live = liveResults || { r32Winners:[], r16Winners:[], qfWinners:[], sfWinners:[], champion:null };
 
-      <div class="bracket-viewer-section">
-        <div class="bracket-viewer-section-title">GROUP STAGE PICKS</div>
-        <div class="bracket-viewer-groups">
-          ${groupRows || '<p style="color:var(--gray);font-size:0.82rem">No group picks saved</p>'}
-        </div>
-      </div>
+  // Match height = 62px (2x 31px slots)
+  // Spacing between matches in each round:
+  const MATCH_H = 62;
+  const spacings = [4, 4+MATCH_H, 4+MATCH_H*3, 4+MATCH_H*7];
 
-      ${(s.bestThird||[]).length ? `
-        <div class="bracket-viewer-section">
-          <div class="bracket-viewer-section-title">BEST 3RD PLACE PICKS</div>
-          <div class="bracket-viewer-picks">
-            ${s.bestThird.map(t => `
-              <div class="bracket-viewer-pick">
-                ${flagImg(t,"circle")}
-                <span style="flex:1">${t}</span>
-                <span style="color:var(--gold);font-size:0.75rem">+1 pt</span>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-      ` : ""}
+  const rounds = [
+    { label:"R32  +2pts",  matchups: r32Matchups, picks: s.r32Picks||{}, winners: live.r32Winners, pickKey:"r32Picks", pts:POINTS.r32, spacing: spacings[0] },
+    { label:"R16  +4pts",  matchups: r16Matchups, picks: s.r16Picks||{}, winners: live.r16Winners, pickKey:"r16Picks", pts:POINTS.r16, spacing: spacings[1] },
+    { label:"QF   +8pts",  matchups: qfMatchups,  picks: s.qfPicks||{},  winners: live.qfWinners,  pickKey:"qfPicks",  pts:POINTS.qf,  spacing: spacings[2] },
+    { label:"SF  +16pts",  matchups: sfMatchups,  picks: s.sfPicks||{},  winners: live.sfWinners,  pickKey:"sfPicks",  pts:POINTS.sf,  spacing: spacings[3] },
+  ];
 
-      ${knockoutRows}
+  const wrap = document.createElement("div");
+  wrap.className = "bracket-scroll-wrap";
+  const visual = document.createElement("div");
+  visual.className = "bracket-visual";
+  wrap.appendChild(visual);
 
-      ${s.thirdPick ? `
-        <div class="bracket-viewer-section">
-          <div class="bracket-viewer-section-title">3RD PLACE PICK</div>
-          <div class="bracket-viewer-pick">
-            ${flagImg(s.thirdPick,"circle")}
-            <span style="flex:1">${s.thirdPick}</span>
-            <span style="color:var(--gold);font-size:0.75rem">+16 pts</span>
-          </div>
-        </div>
-      ` : ""}
+  rounds.forEach((round, roundIdx) => {
+    const roundDiv = document.createElement("div");
+    roundDiv.className = "bv-round";
 
-      ${s.finalPick ? `
-        <div class="bracket-viewer-section">
-          <div class="bracket-viewer-section-title">🏆 CHAMPION PICK</div>
-          <div class="bracket-viewer-pick champion">
-            ${flagImg(s.finalPick,"circle")}
-            <span style="flex:1;font-weight:700">${s.finalPick}</span>
-            <span style="color:var(--gold);font-size:0.75rem">+32 pts</span>
-          </div>
-        </div>
-      ` : ""}
-    </div>
-  `;
+    const header = document.createElement("div");
+    header.className = "bv-round-header";
+    header.textContent = round.label;
+    roundDiv.appendChild(header);
 
-  overlay.addEventListener("click", e => {
-    if (e.target === overlay) overlay.remove();
+    const matchesDiv = document.createElement("div");
+    matchesDiv.className = "bv-matches";
+
+    round.matchups.forEach(([t1, t2], matchIdx) => {
+      const matchGroup = document.createElement("div");
+      matchGroup.className = "bv-match-group";
+      if (matchIdx > 0) matchGroup.style.marginTop = round.spacing + "px";
+
+      const matchDiv = document.createElement("div");
+      matchDiv.className = "bv-match";
+
+      [t1, t2].forEach((teamName, slotIdx) => {
+        const currentPick = round.picks[matchIdx];
+        const isSelected  = teamName && currentPick === teamName;
+        const isWinner    = teamName && round.winners.includes(teamName);
+        const isCorrect   = isSelected && isWinner;
+        const isLocked    = TOURNAMENT_STARTED || (state.locked && state.locked[round.pickKey?.replace("Picks","")]);
+        const isWrong     = isSelected && isLocked && !isWinner && round.winners.length > 0;
+        const isTBD       = !teamName;
+
+        const teamDiv = document.createElement("div");
+        teamDiv.className = "bv-team"
+          + (isTBD ? " tbd" : "")
+          + (isSelected && !isCorrect && !isWrong ? " selected" : "")
+          + (isCorrect ? " correct" : "")
+          + (isWrong   ? " wrong"   : "")
+          + (isLocked || isReadOnly ? " locked" : "");
+
+        teamDiv.innerHTML = `
+          ${isTBD ? '<div class="bv-flag-placeholder"></div>' : bvFlagImg(teamName)}
+          <span class="bv-name ${isTBD?"tbd-name":""}">${teamName || "TBD"}</span>
+          ${isCorrect ? `<span class="bv-badge correct">+${round.pts}</span>` : ""}
+          ${isWrong   ? `<span class="bv-badge wrong">✗</span>` : ""}
+        `;
+
+        // Info button (only for real teams)
+        if (teamName && !isReadOnly) {
+          const infoBtn = document.createElement("button");
+          infoBtn.className = "bv-info-btn";
+          infoBtn.textContent = "ℹ";
+          infoBtn.title = `Info: ${teamName}`;
+          infoBtn.addEventListener("click", e => {
+            e.stopPropagation();
+            // Find team in GROUPS
+            let foundTeam = null, foundGroup = null;
+            Object.entries(GROUPS).forEach(([letter, teams]) => {
+              const t = teams.find(t => t.name === teamName);
+              if (t) { foundTeam = t; foundGroup = letter; }
+            });
+            if (foundTeam) openModal(foundTeam, foundGroup);
+          });
+          teamDiv.appendChild(infoBtn);
+        }
+
+        // Click to pick (only if not read-only and not locked)
+        if (teamName && !isTBD && !isLocked && !isReadOnly) {
+          teamDiv.style.cursor = "pointer";
+          teamDiv.addEventListener("click", () => {
+            if (!state[round.pickKey]) state[round.pickKey] = {};
+            state[round.pickKey][matchIdx] = teamName;
+            showToast(`⚡ ${teamName} advances!`);
+            saveState(); recalcPoints(); renderKnockout();
+          });
+        }
+
+        matchDiv.appendChild(teamDiv);
+      });
+
+      matchGroup.appendChild(matchDiv);
+
+      // Connector to next round (right side bracket lines)
+      if (roundIdx < rounds.length) {
+        const connHeight = MATCH_H + round.spacing;
+        const isEven = matchIdx % 2 === 0;
+        const conn = document.createElement("div");
+        conn.className = "bv-connector";
+        conn.style.height = connHeight + "px";
+        const top = document.createElement("div");
+        top.className = "bv-connector-top";
+        const bot = document.createElement("div");
+        bot.className = "bv-connector-bottom";
+        conn.appendChild(top);
+        conn.appendChild(bot);
+        matchGroup.appendChild(conn);
+      }
+
+      matchesDiv.appendChild(matchGroup);
+    });
+
+    roundDiv.appendChild(matchesDiv);
+    visual.appendChild(roundDiv);
   });
 
-  document.body.appendChild(overlay);
+  // Final round
+  const finalDiv = document.createElement("div");
+  finalDiv.className = "bv-round";
+
+  const finalHeader = document.createElement("div");
+  finalHeader.className = "bv-round-header";
+  finalHeader.textContent = "Final +32pts";
+  finalDiv.appendChild(finalHeader);
+
+  const finalMatchDiv = document.createElement("div");
+  finalMatchDiv.className = "bv-match";
+  finalMatchDiv.style.marginTop = spacings[3]*3.5+"px";
+
+  [finMatchup[0], finMatchup[1]].forEach(teamName => {
+    const isSelected = teamName && champion === teamName;
+    const isWinner   = teamName && live.champion === teamName;
+    const isCorrect  = isSelected && isWinner;
+    const isLocked   = TOURNAMENT_STARTED || state.locked?.final;
+    const isWrong    = isSelected && isLocked && !isWinner && live.champion;
+    const isTBD      = !teamName;
+
+    const teamDiv = document.createElement("div");
+    teamDiv.className = "bv-team"
+      + (isTBD ? " tbd" : "")
+      + (isSelected && !isCorrect && !isWrong ? " selected" : "")
+      + (isCorrect ? " correct" : "")
+      + (isWrong   ? " wrong"   : "")
+      + (isLocked || isReadOnly ? " locked" : "");
+
+    teamDiv.innerHTML = `
+      ${isTBD ? '<div class="bv-flag-placeholder"></div>' : bvFlagImg(teamName)}
+      <span class="bv-name ${isTBD?"tbd-name":""}">${teamName || "TBD"}</span>
+      ${isCorrect ? `<span class="bv-badge correct">+32</span>` : ""}
+      ${isWrong   ? `<span class="bv-badge wrong">✗</span>` : ""}
+    `;
+
+    if (teamName && !isTBD && !isLocked && !isReadOnly) {
+      teamDiv.style.cursor = "pointer";
+      teamDiv.addEventListener("click", () => {
+        state.finalPick = teamName;
+        document.getElementById("championSection").classList.remove("hidden");
+        renderChampion(teamName);
+        launchConfetti();
+        showToast(`🏆 ${teamName} is your CHAMPION!`, 4000);
+        saveState(); recalcPoints(); renderKnockout();
+      });
+    }
+
+    finalMatchDiv.appendChild(teamDiv);
+  });
+
+  finalDiv.appendChild(finalMatchDiv);
+
+  // Connector from SF to Final
+  const finalConn = document.createElement("div");
+  finalConn.style.cssText = `width:20px;flex-shrink:0;border-top:1px solid rgba(245,197,24,0.35);margin-top:${spacings[3]*3.5 + MATCH_H/2 - 0.5}px;`;
+  visual.appendChild(finalConn);
+  visual.appendChild(finalDiv);
+
+  // Champion display
+  const champConn = document.createElement("div");
+  champConn.style.cssText = `width:20px;flex-shrink:0;border-top:1px solid var(--gold);margin-top:${spacings[3]*3.5 + MATCH_H/2 - 0.5}px;`;
+  visual.appendChild(champConn);
+
+  const champDiv = document.createElement("div");
+  champDiv.className = "bv-round";
+  champDiv.style.marginTop = spacings[3]*3.5 + "px";
+
+  if (champion) {
+    champDiv.innerHTML = `
+      <div class="bv-champion">
+        <div class="bv-champion-trophy">🏆</div>
+        <img class="bv-champion-flag" src="${FLAGS[champion]||''}" alt="${champion}">
+        <div class="bv-champion-name">${champion}</div>
+        <div class="bv-champion-label">Champion</div>
+      </div>
+    `;
+  } else {
+    champDiv.innerHTML = `
+      <div class="bv-champion" style="opacity:0.4">
+        <div class="bv-champion-trophy">🏆</div>
+        <div class="bv-flag-placeholder" style="width:44px;height:44px;border-radius:50%;"></div>
+        <div class="bv-champion-name" style="font-size:0.7rem;color:var(--gray)">TBD</div>
+        <div class="bv-champion-label">Champion</div>
+      </div>
+    `;
+  }
+
+  visual.appendChild(champDiv);
+  container.appendChild(wrap);
 }
 
 // ===================== SCORING ENGINE =====================
@@ -556,25 +690,22 @@ function renderLeaderboardFromEntries(entries) {
   const medals = ["🥇","🥈","🥉"];
   const myName = localStorage.getItem("wc2026_myname") || "";
 
-  el.innerHTML = entries.map((e, i) => {
-    const entryJson = JSON.stringify(e).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-    return `
-      <div class="leaderboard-row ${i===0?"first":""}">
-        <span class="lb-rank">${medals[i]||"#"+(i+1)}</span>
-        <span class="lb-name-clickable" onclick='viewBracket(${JSON.stringify(e).replace(/</g,"&lt;").replace(/>/g,"&gt;")})'>${e.name} 👁</span>
-        <span class="lb-champion">
-          ${e.champion&&FLAGS[e.champion]
-            ? `<img class="flag flag-rect" src="${FLAGS[e.champion]}" style="width:22px;height:15px"> ${e.champion}`
-            : e.champion||"TBD"}
-        </span>
-        <span class="lb-pts">${e.points} pts</span>
-        <span class="lb-date">${e.savedAt}</span>
-        ${!TOURNAMENT_STARTED && myName.toLowerCase()===e.name.toLowerCase()
-          ? `<button class="lb-delete" onclick="deleteEntry('${e.name}')">✕</button>`
-          : '<span style="width:24px"></span>'}
-      </div>
-    `;
-  }).join("");
+  el.innerHTML = entries.map((e, i) => `
+    <div class="leaderboard-row ${i===0?"first":""}">
+      <span class="lb-rank">${medals[i]||"#"+(i+1)}</span>
+      <span class="lb-name-clickable" onclick='viewBracket(${JSON.stringify(e).replace(/</g,"&lt;").replace(/>/g,"&gt;")})'>${e.name} 👁</span>
+      <span class="lb-champion">
+        ${e.champion&&FLAGS[e.champion]
+          ? `<img class="flag flag-circle" src="${FLAGS[e.champion]}" style="width:22px;height:22px"> ${e.champion}`
+          : e.champion||"TBD"}
+      </span>
+      <span class="lb-pts">${e.points} pts</span>
+      <span class="lb-date">${e.savedAt}</span>
+      ${!TOURNAMENT_STARTED && myName.toLowerCase()===e.name.toLowerCase()
+        ? `<button class="lb-delete" onclick="deleteEntry('${e.name}')">✕</button>`
+        : '<span style="width:24px"></span>'}
+    </div>
+  `).join("");
 }
 
 async function recalcLeaderboardScores(entries) {
@@ -596,6 +727,64 @@ async function recalcLeaderboardScores(entries) {
     await Promise.all(updates);
     console.log(`✅ Updated ${updates.length} scores`);
   }
+}
+
+// ===================== BRACKET VIEWER =====================
+function viewBracket(entryJson) {
+  const entry = typeof entryJson === "string" ? JSON.parse(entryJson) : entryJson;
+  if (!entry.bracket) { showToast("⚠️ No bracket data saved"); return; }
+
+  let s;
+  try {
+    s = JSON.parse(decodeURIComponent(escape(atob(entry.bracket))));
+  } catch(e) { showToast("⚠️ Could not load bracket"); return; }
+
+  const existing = document.getElementById("bracketViewerModal");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.className = "bracket-modal-overlay";
+  overlay.id = "bracketViewerModal";
+
+  const card = document.createElement("div");
+  card.className = "bracket-modal-card";
+
+  card.innerHTML = `
+    <button class="modal-close" onclick="document.getElementById('bracketViewerModal').remove()">✕</button>
+    <div class="bracket-viewer-header">
+      <div class="bracket-viewer-name">${entry.name}'s Bracket</div>
+      <div class="bracket-viewer-pts">${entry.points} pts</div>
+    </div>
+    <p style="color:var(--gray);font-size:0.75rem;letter-spacing:1px;margin-bottom:12px">Scroll right to see full bracket →</p>
+  `;
+
+  // Build visual bracket in read-only mode
+  buildBracketVisual(s, state.liveResults, true, card);
+
+  // Also show group picks summary below
+  const groupSummary = document.createElement("div");
+  groupSummary.style.marginTop = "24px";
+  groupSummary.innerHTML = `
+    <div style="font-family:var(--font-display);font-size:1rem;letter-spacing:3px;color:var(--gold);margin-bottom:12px;padding-top:16px;border-top:1px solid var(--card-border)">GROUP PICKS</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">
+      ${Object.entries(s.groupPicks||{}).map(([letter, gp]) => {
+        if (!gp || Array.isArray(gp)) return "";
+        return `
+          <div style="background:var(--card-bg);border:1px solid var(--card-border);border-radius:8px;padding:8px 10px">
+            <div style="font-size:0.65rem;color:var(--gold);letter-spacing:2px;font-family:var(--font-display);margin-bottom:6px">GROUP ${letter}</div>
+            ${gp.first  ? `<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;margin-bottom:3px">${bvFlagImg(gp.first)} 🥇 ${gp.first}</div>`  : ""}
+            ${gp.second ? `<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;margin-bottom:3px">${bvFlagImg(gp.second)} 🥈 ${gp.second}</div>` : ""}
+            ${gp.third  ? `<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem">${bvFlagImg(gp.third)} 🥉 ${gp.third}</div>`                   : ""}
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+  card.appendChild(groupSummary);
+
+  overlay.appendChild(card);
+  overlay.addEventListener("click", e => { if (e.target===overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
 }
 
 // ===================== LIVE STRIP =====================
@@ -882,108 +1071,15 @@ function toggleBestThird(teamName) {
   saveState(); recalcPoints(); renderThirdPlacePool();
 }
 
-// ===================== KNOCKOUT =====================
-function buildR32Matchups() {
-  const gp=state.groupPicks;
-  const g=l=>gp[l]||{};
-  return [
-    {team1:g("A").first, team2:g("B").second},
-    {team1:g("C").first, team2:g("D").second},
-    {team1:g("E").first, team2:g("F").second},
-    {team1:g("G").first, team2:g("H").second},
-    {team1:g("I").first, team2:g("J").second},
-    {team1:g("K").first, team2:g("L").second},
-    {team1:g("B").first, team2:g("A").second},
-    {team1:g("D").first, team2:g("C").second},
-    {team1:g("F").first, team2:g("E").second},
-    {team1:g("H").first, team2:g("G").second},
-    {team1:g("J").first, team2:g("I").second},
-    {team1:g("L").first, team2:g("K").second},
-    {team1:(state.bestThird||[])[0]||null, team2:(state.bestThird||[])[1]||null},
-    {team1:(state.bestThird||[])[2]||null, team2:(state.bestThird||[])[3]||null},
-    {team1:(state.bestThird||[])[4]||null, team2:(state.bestThird||[])[5]||null},
-    {team1:(state.bestThird||[])[6]||null, team2:(state.bestThird||[])[7]||null},
-  ];
-}
-
-function renderTeamSlot(teamName, key, matchIdx, winners, isLocked, pts) {
-  const isTBD=(teamName===null||teamName===undefined);
-  const currentPick=(state[key]||{})[matchIdx];
-  const isSelected=teamName&&currentPick===teamName;
-  const isWinner=teamName&&winners.includes(teamName);
-  const isCorrect=isSelected&&isWinner;
-  const isWrong=isSelected&&isLocked&&!isWinner&&winners.length>0;
-  const locked=isLocked||TOURNAMENT_STARTED;
-
-  const div=document.createElement("div");
-  div.className="match-team"
-    +(isSelected?" selected":"")
-    +(isTBD?" tbd":"")
-    +(isCorrect?" correct":"")
-    +(isWrong?" wrong":"");
-
-  div.innerHTML=`
-    ${isTBD?'<span class="flag-placeholder">⏳</span>':flagImg(teamName,"circle")}
-    <span class="team-name">${teamName||"TBD"}</span>
-    ${isCorrect?`<span class="live-badge correct" style="margin-left:auto">+${pts}</span>`:""}
-    ${isWrong?'<span class="live-badge elim" style="margin-left:auto">✗</span>':""}
-    ${isSelected&&!locked&&!isCorrect&&!isWrong?'<span class="check-icon" style="margin-left:auto">✓</span>':""}
-  `;
-
-  if (!isTBD&&!locked) {
-    div.addEventListener("click",()=>{
-      if (!state[key]) state[key]={};
-      state[key][matchIdx]=teamName;
-      showToast(`⚡ ${teamName} advances!`);
-      saveState(); recalcPoints(); renderKnockout();
-    });
-  }
-  return div;
-}
-
+// ===================== KNOCKOUT — VISUAL BRACKET =====================
 function renderKnockout() {
-  const bracket=document.getElementById("knockoutBracket");
-  bracket.innerHTML="";
+  const container = document.getElementById("knockoutBracket");
+  container.innerHTML = "";
+  buildBracketVisual(state, state.liveResults, false, container);
 
-  const r32=buildR32Matchups();
-  const r16=[]; for(let i=0;i<16;i+=2) r16.push({team1:state.r32Picks[i]||null,team2:state.r32Picks[i+1]||null});
-  const qf=[];  for(let i=0;i<8; i+=2) qf.push ({team1:state.r16Picks[i]||null,team2:state.r16Picks[i+1]||null});
-  const sf=[];  for(let i=0;i<4; i+=2) sf.push ({team1:state.qfPicks[i]||null, team2:state.qfPicks[i+1]||null});
-
-  const rounds=[
-    {key:"r32Picks",lockKey:"r32",label:"ROUND OF 32 — 16 MATCHES",  winners:state.liveResults.r32Winners,matchups:r32,pts:POINTS.r32},
-    {key:"r16Picks",lockKey:"r16",label:"ROUND OF 16 — 8 MATCHES",   winners:state.liveResults.r16Winners,matchups:r16,pts:POINTS.r16},
-    {key:"qfPicks", lockKey:"qf", label:"QUARTERFINALS — 4 MATCHES", winners:state.liveResults.qfWinners, matchups:qf, pts:POINTS.qf },
-    {key:"sfPicks", lockKey:"sf", label:"SEMIFINALS — 2 MATCHES",    winners:state.liveResults.sfWinners, matchups:sf, pts:POINTS.sf },
-  ];
-
-  rounds.forEach(({key,lockKey,label,matchups,winners,pts})=>{
-    if (!matchups.some(m=>m.team1||m.team2)) return;
-    const isLocked=state.locked[lockKey]||TOURNAMENT_STARTED;
-    const roundDiv=document.createElement("div");
-    roundDiv.innerHTML=`
-      <div class="round-label">
-        ${label}
-        ${isLocked?'<span class="lock-tag">🔒 LOCKED</span>':""}
-        <span class="pts-tag">+${pts} pts/correct</span>
-      </div>
-    `;
-    const row=document.createElement("div");
-    row.className="matches-row";
-    matchups.forEach((match,matchIdx)=>{
-      if (!match.team1&&!match.team2) return;
-      const card=document.createElement("div");
-      card.className="match-card";
-      card.appendChild(renderTeamSlot(match.team1,key,matchIdx,winners,isLocked,pts));
-      card.appendChild(renderTeamSlot(match.team2,key,matchIdx,winners,isLocked,pts));
-      row.appendChild(card);
-    });
-    roundDiv.appendChild(row);
-    bracket.appendChild(roundDiv);
-  });
-
-  const sfPicks=Object.values(state.sfPicks).filter(Boolean);
-  if (sfPicks.length>=2) {
+  // Show 3rd place and final sections below
+  const sfPicks = Object.values(state.sfPicks).filter(Boolean);
+  if (sfPicks.length >= 2) {
     document.getElementById("thirdPlaceSection").classList.remove("hidden");
     document.getElementById("finalSection").classList.remove("hidden");
     renderThirdPlace();
