@@ -234,7 +234,6 @@ document.getElementById("teamModal").addEventListener("click", e => {
 
 // ===================== VISUAL BRACKET RENDERER =====================
 function buildBracketVisual(s, liveResults, isReadOnly, container) {
-  // Build match arrays from state
   const gp = s.groupPicks || {};
   const g  = l => gp[l] || {};
   const bt = s.bestThird || [];
@@ -264,10 +263,21 @@ function buildBracketVisual(s, liveResults, isReadOnly, container) {
 
   const live = liveResults || { r32Winners:[], r16Winners:[], qfWinners:[], sfWinners:[], champion:null };
 
-  // Match height = 62px (2x 31px slots)
-  // Spacing between matches in each round:
-  const MATCH_H = 62;
+  // Layout constants
+  const MATCH_H  = 62;   // height of one match card (2 x 31px slots)
   const spacings = [4, 4+MATCH_H, 4+MATCH_H*3, 4+MATCH_H*7];
+
+  // Total height of the bracket column = 16 matches * MATCH_H + 15 * spacing[0]
+  const TOTAL_H = 16 * MATCH_H + 15 * spacings[0];
+
+  // finCenter: vertical midpoint of the Final match card inside the bracket column
+  // The Final card starts at spacings[3]*3.5 from the top of the SF column,
+  // but we need it relative to the top of the whole visual.
+  // R32 col top = 0; each round's first match top = 0 (no leading margin).
+  // SF has 2 matches, spacing[3] gap. The Final card is placed at spacings[3]*3.5
+  // below the top of the Final column header area. We offset by MATCH_H/2 to get center.
+  const finTop    = spacings[3] * 3.5;
+  const finCenter = finTop + MATCH_H / 2;
 
   const rounds = [
     { label:"R32  +2pts",  matchups: r32Matchups, picks: s.r32Picks||{}, winners: live.r32Winners, pickKey:"r32Picks", pts:POINTS.r32, spacing: spacings[0] },
@@ -302,7 +312,7 @@ function buildBracketVisual(s, liveResults, isReadOnly, container) {
       const matchDiv = document.createElement("div");
       matchDiv.className = "bv-match";
 
-      [t1, t2].forEach((teamName, slotIdx) => {
+      [t1, t2].forEach((teamName) => {
         const currentPick = round.picks[matchIdx];
         const isSelected  = teamName && currentPick === teamName;
         const isWinner    = teamName && round.winners.includes(teamName);
@@ -326,7 +336,6 @@ function buildBracketVisual(s, liveResults, isReadOnly, container) {
           ${isWrong   ? `<span class="bv-badge wrong">✗</span>` : ""}
         `;
 
-        // Info button (only for real teams)
         if (teamName && !isReadOnly) {
           const infoBtn = document.createElement("button");
           infoBtn.className = "bv-info-btn";
@@ -334,7 +343,6 @@ function buildBracketVisual(s, liveResults, isReadOnly, container) {
           infoBtn.title = `Info: ${teamName}`;
           infoBtn.addEventListener("click", e => {
             e.stopPropagation();
-            // Find team in GROUPS
             let foundTeam = null, foundGroup = null;
             Object.entries(GROUPS).forEach(([letter, teams]) => {
               const t = teams.find(t => t.name === teamName);
@@ -345,7 +353,6 @@ function buildBracketVisual(s, liveResults, isReadOnly, container) {
           teamDiv.appendChild(infoBtn);
         }
 
-        // Click to pick (only if not read-only and not locked)
         if (teamName && !isTBD && !isLocked && !isReadOnly) {
           teamDiv.style.cursor = "pointer";
           teamDiv.addEventListener("click", () => {
@@ -361,10 +368,8 @@ function buildBracketVisual(s, liveResults, isReadOnly, container) {
 
       matchGroup.appendChild(matchDiv);
 
-      // Connector to next round (right side bracket lines)
       if (roundIdx < rounds.length) {
         const connHeight = MATCH_H + round.spacing;
-        const isEven = matchIdx % 2 === 0;
         const conn = document.createElement("div");
         conn.className = "bv-connector";
         conn.style.height = connHeight + "px";
@@ -384,7 +389,7 @@ function buildBracketVisual(s, liveResults, isReadOnly, container) {
     visual.appendChild(roundDiv);
   });
 
-  // Final round
+  // ---- FINAL ROUND ----
   const finalDiv = document.createElement("div");
   finalDiv.className = "bv-round";
 
@@ -395,7 +400,7 @@ function buildBracketVisual(s, liveResults, isReadOnly, container) {
 
   const finalMatchDiv = document.createElement("div");
   finalMatchDiv.className = "bv-match";
-  finalMatchDiv.style.marginTop = spacings[3]*3.5+"px";
+  finalMatchDiv.style.marginTop = finTop + "px";
 
   [finMatchup[0], finMatchup[1]].forEach(teamName => {
     const isSelected = teamName && champion === teamName;
@@ -437,43 +442,132 @@ function buildBracketVisual(s, liveResults, isReadOnly, container) {
 
   finalDiv.appendChild(finalMatchDiv);
 
-  // Connector from SF to Final
+  // Connector line from SF column to Final
   const finalConn = document.createElement("div");
-  finalConn.style.cssText = `width:20px;flex-shrink:0;border-top:1px solid rgba(245,197,24,0.35);margin-top:${spacings[3]*3.5 + MATCH_H/2 - 0.5}px;`;
+  finalConn.style.cssText = `width:20px;flex-shrink:0;border-top:1px solid rgba(245,197,24,0.35);margin-top:${finCenter - 0.5}px;`;
   visual.appendChild(finalConn);
   visual.appendChild(finalDiv);
 
-  // Champion display
+  // ---- CHAMPION BOX ----
+  // Uses a relatively-positioned wrapper with TOTAL_H so the
+  // absolutely-positioned champion box lands at finCenter regardless of bracket height.
   const champConn = document.createElement("div");
-  champConn.style.cssText = `width:20px;flex-shrink:0;border-top:1px solid var(--gold);margin-top:${spacings[3]*3.5 + MATCH_H/2 - 0.5}px;`;
+  champConn.style.cssText = `width:20px;flex-shrink:0;border-top:1px solid var(--gold);margin-top:${finCenter - 0.5}px;`;
   visual.appendChild(champConn);
 
-  const champDiv = document.createElement("div");
-  champDiv.className = "bv-round";
-  champDiv.style.marginTop = spacings[3]*3.5 + "px";
+  // Outer wrapper matches the bracket column height so position:absolute works
+  const champOuter = document.createElement("div");
+  champOuter.style.cssText = `position:relative;flex-shrink:0;width:120px;height:${TOTAL_H}px;`;
+
+  // Inner box absolutely centered at finCenter
+  const champInner = document.createElement("div");
+  champInner.style.cssText = `position:absolute;left:0;top:${finCenter - 62}px;width:120px;`;
 
   if (champion) {
-    champDiv.innerHTML = `
+    const isCC = state.liveResults.champion === champion;
+    champInner.innerHTML = `
       <div class="bv-champion">
         <div class="bv-champion-trophy">🏆</div>
         <img class="bv-champion-flag" src="${FLAGS[champion]||''}" alt="${champion}">
         <div class="bv-champion-name">${champion}</div>
-        <div class="bv-champion-label">Champion</div>
+        <div class="bv-champion-label">${isCC ? "✅ CORRECT!" : "CHAMPION"}</div>
+        ${isCC ? `<div style="font-size:0.65rem;color:var(--gold);font-weight:700;letter-spacing:1px">+32 pts!</div>` : ""}
       </div>
     `;
   } else {
-    champDiv.innerHTML = `
+    champInner.innerHTML = `
       <div class="bv-champion" style="opacity:0.4">
         <div class="bv-champion-trophy">🏆</div>
         <div class="bv-flag-placeholder" style="width:44px;height:44px;border-radius:50%;"></div>
         <div class="bv-champion-name" style="font-size:0.7rem;color:var(--gray)">TBD</div>
-        <div class="bv-champion-label">Champion</div>
+        <div class="bv-champion-label">CHAMPION</div>
       </div>
     `;
   }
 
-  visual.appendChild(champDiv);
+  champOuter.appendChild(champInner);
+  visual.appendChild(champOuter);
   container.appendChild(wrap);
+
+  // ---- 3RD PLACE below bracket ----
+  const sfWinners = Object.values(s.sfPicks||{}).filter(Boolean);
+  const qfPicked  = Object.values(s.qfPicks||{}).filter(Boolean);
+  const sfLosers  = qfPicked.filter(t => !sfWinners.includes(t)).slice(0,2);
+
+  if (sfLosers.length >= 2) {
+    const thirdDiv = document.createElement("div");
+    thirdDiv.style.cssText = "margin-top:28px;padding:18px 20px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius)";
+
+    const title = document.createElement("div");
+    title.style.cssText = "font-family:var(--font-display);font-size:1rem;letter-spacing:3px;color:var(--gold);margin-bottom:12px";
+    title.innerHTML = `🥉 3RD PLACE MATCH <span style="font-size:0.8rem;color:var(--gray);font-family:var(--font-body);letter-spacing:1px">+16 pts</span>`;
+    thirdDiv.appendChild(title);
+
+    const teamsRow = document.createElement("div");
+    teamsRow.style.cssText = "display:flex;gap:12px;flex-wrap:wrap";
+
+    const isLocked3 = TOURNAMENT_STARTED || state.locked?.sf;
+    const real3rd   = live.thirdPlace;
+
+    sfLosers.forEach(name => {
+      const isSel    = s.thirdPick === name;
+      const isWin    = real3rd === name;
+      const isCorrect = isSel && isWin;
+      const isWrong   = isSel && isLocked3 && !isWin && real3rd;
+
+      const td = document.createElement("div");
+      td.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 14px;
+        background:${isCorrect?"rgba(46,204,113,0.08)":isWrong?"rgba(231,76,60,0.07)":isSel?"rgba(205,127,50,0.1)":"rgba(255,255,255,0.04)"};
+        border:1px solid ${isCorrect?"#2ecc71":isWrong?"#e74c3c":isSel?"var(--bronze)":"rgba(255,255,255,0.1)"};
+        border-radius:10px;flex:1;min-width:140px;
+        cursor:${isLocked3||isReadOnly?"default":"pointer"};
+        transition:all 0.2s`;
+
+      if (FLAGS[name]) {
+        const img = document.createElement("img");
+        img.src = FLAGS[name]; img.alt = name;
+        img.style.cssText = "width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid rgba(255,255,255,0.15);flex-shrink:0";
+        td.appendChild(img);
+      }
+      const span = document.createElement("span");
+      span.style.cssText = "font-weight:700;font-size:0.9rem;flex:1";
+      span.textContent = name;
+      td.appendChild(span);
+
+      if (isCorrect) {
+        const b = document.createElement("span");
+        b.style.cssText = "font-size:10px;padding:2px 6px;border-radius:3px;font-weight:700;background:rgba(245,197,24,0.2);color:#f5c518;border:1px solid #f5c518";
+        b.textContent = "+16";
+        td.appendChild(b);
+      }
+      if (isWrong) {
+        const b = document.createElement("span");
+        b.style.cssText = "font-size:10px;padding:2px 6px;border-radius:3px;font-weight:700;background:rgba(231,76,60,0.2);color:#e74c3c";
+        b.textContent = "✗";
+        td.appendChild(b);
+      }
+
+      if (!isLocked3 && !isReadOnly) {
+        td.addEventListener("click", () => {
+          state.thirdPick = name;
+          showToast(`🥉 ${name} — 3rd place!`);
+          saveState(); recalcPoints(); renderKnockout();
+        });
+      }
+      teamsRow.appendChild(td);
+    });
+
+    thirdDiv.appendChild(teamsRow);
+
+    if (real3rd) {
+      const note = document.createElement("p");
+      note.style.cssText = "font-size:0.8rem;color:var(--green-adv);margin-top:10px;letter-spacing:1px";
+      note.textContent = `🥉 Actual 3rd place: ${real3rd}`;
+      thirdDiv.appendChild(note);
+    }
+
+    container.appendChild(thirdDiv);
+  }
 }
 
 // ===================== SCORING ENGINE =====================
@@ -758,10 +852,8 @@ function viewBracket(entryJson) {
     <p style="color:var(--gray);font-size:0.75rem;letter-spacing:1px;margin-bottom:12px">Scroll right to see full bracket →</p>
   `;
 
-  // Build visual bracket in read-only mode
   buildBracketVisual(s, state.liveResults, true, card);
 
-  // Also show group picks summary below
   const groupSummary = document.createElement("div");
   groupSummary.style.marginTop = "24px";
   groupSummary.innerHTML = `
@@ -914,11 +1006,11 @@ async function fetchLiveResults() {
     const allGDone = Object.keys(standings).length===12 &&
       Object.values(standings).every(g=>Object.values(g).every(s=>s.played===3));
 
-    if (allGDone)               state.locked.group=true;
-    if (r32c>=16)               state.locked.r32=true;
-    if (r16c>=8)                state.locked.r16=true;
-    if (qfc>=4)                 state.locked.qf=true;
-    if (sfc>=2)                 state.locked.sf=true;
+    if (allGDone)                   state.locked.group=true;
+    if (r32c>=16)                   state.locked.r32=true;
+    if (r16c>=8)                    state.locked.r16=true;
+    if (qfc>=4)                     state.locked.qf=true;
+    if (sfc>=2)                     state.locked.sf=true;
     if (state.liveResults.champion) state.locked.final=true;
 
     saveState();
@@ -926,7 +1018,6 @@ async function fetchLiveResults() {
     renderGroups();
     const ko=document.getElementById("knockoutSection");
     if (ko&&!ko.classList.contains("hidden")) renderKnockout();
-    if (state.thirdPick) renderThirdPlace();
     if (state.finalPick) renderChampion(state.finalPick);
 
     showToast(live.length>0
@@ -1071,111 +1162,11 @@ function toggleBestThird(teamName) {
   saveState(); recalcPoints(); renderThirdPlacePool();
 }
 
-// ===================== KNOCKOUT — VISUAL BRACKET =====================
+// ===================== KNOCKOUT =====================
 function renderKnockout() {
   const container = document.getElementById("knockoutBracket");
   container.innerHTML = "";
   buildBracketVisual(state, state.liveResults, false, container);
-
-  // Show 3rd place and final sections below
-  const sfPicks = Object.values(state.sfPicks).filter(Boolean);
-  if (sfPicks.length >= 2) {
-    document.getElementById("thirdPlaceSection").classList.remove("hidden");
-    document.getElementById("finalSection").classList.remove("hidden");
-    renderThirdPlace();
-    renderFinal();
-  }
-}
-
-// ===================== 3RD PLACE =====================
-function renderThirdPlace() {
-  const el=document.getElementById("thirdPlaceDisplay");
-  const sfWinners=Object.values(state.sfPicks).filter(Boolean);
-  const qfPicked=Object.values(state.qfPicks).filter(Boolean);
-  const sfLosers=qfPicked.filter(t=>!sfWinners.includes(t)).slice(0,2);
-
-  if (sfLosers.length<2) {
-    el.innerHTML=`<p class="section-hint">Finish both semifinal picks to unlock 3rd place.</p>`;
-    return;
-  }
-  const isLocked=state.locked.sf||TOURNAMENT_STARTED;
-  const realThird=state.liveResults.thirdPlace;
-  el.innerHTML=`
-    <p class="section-hint" style="margin-bottom:16px">Pick the 3rd place winner — +16 pts!</p>
-    <div class="matches-row" style="justify-content:center">
-      <div class="match-card" style="max-width:320px;width:100%">
-        ${sfLosers.map(teamName=>{
-          const isSel=state.thirdPick===teamName;
-          const isWin=realThird===teamName;
-          const correct=isSel&&isWin;
-          const wrong=isSel&&isLocked&&!isWin&&realThird;
-          return `
-            <div class="match-team ${isSel?"selected":""} ${correct?"correct":""} ${wrong?"wrong":""}"
-                 style="cursor:${isLocked?"default":"pointer"}"
-                 onclick="${!isLocked?`pickThird('${teamName}')`:""} ">
-              ${flagImg(teamName,"circle")}
-              <span class="team-name">${teamName}</span>
-              ${correct?'<span class="live-badge correct" style="margin-left:auto">+16</span>':""}
-              ${wrong?'<span class="live-badge elim" style="margin-left:auto">✗</span>':""}
-              ${isSel&&!isLocked&&!correct?'<span class="check-icon" style="margin-left:auto">✓</span>':""}
-            </div>`;
-        }).join("")}
-      </div>
-    </div>
-    ${realThird?`<p style="text-align:center;margin-top:12px;color:var(--green-adv);font-size:0.85rem">🥉 Actual 3rd: ${realThird}</p>`:""}
-  `;
-}
-
-function pickThird(teamName) {
-  if (TOURNAMENT_STARTED) { showToast("🔒 Tournament has started — brackets are locked!"); return; }
-  state.thirdPick=teamName;
-  showToast(`🥉 ${teamName} — 3rd place!`);
-  saveState(); recalcPoints(); renderThirdPlace();
-}
-
-// ===================== FINAL =====================
-function renderFinal() {
-  const el=document.getElementById("finalDisplay");
-  const sfWinners=Object.values(state.sfPicks).filter(Boolean).slice(0,2);
-  if (sfWinners.length<2) {
-    el.innerHTML=`<p class="section-hint">Finish both semifinal picks to unlock the final.</p>`;
-    return;
-  }
-  const isLocked=state.locked.final||TOURNAMENT_STARTED;
-  const realChamp=state.liveResults.champion;
-  el.innerHTML=`
-    <p class="section-hint" style="margin-bottom:16px">Pick the World Cup Champion — +32 pts!</p>
-    <div class="matches-row" style="justify-content:center">
-      <div class="match-card" style="max-width:320px;width:100%">
-        ${sfWinners.map(teamName=>{
-          const isSel=state.finalPick===teamName;
-          const isWin=realChamp===teamName;
-          const correct=isSel&&isWin;
-          const wrong=isSel&&isLocked&&!isWin&&realChamp;
-          return `
-            <div class="match-team ${isSel?"selected":""} ${correct?"correct":""} ${wrong?"wrong":""}"
-                 style="cursor:${isLocked?"default":"pointer"}"
-                 onclick="${!isLocked?`pickChampion('${teamName}')`:""} ">
-              ${flagImg(teamName,"circle")}
-              <span class="team-name">${teamName}</span>
-              ${correct?'<span class="live-badge correct" style="margin-left:auto">+32</span>':""}
-              ${wrong?'<span class="live-badge elim" style="margin-left:auto">✗</span>':""}
-              ${isSel&&!isLocked&&!correct?'<span class="check-icon" style="margin-left:auto">✓</span>':""}
-            </div>`;
-        }).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function pickChampion(teamName) {
-  if (TOURNAMENT_STARTED) { showToast("🔒 Tournament has started — brackets are locked!"); return; }
-  state.finalPick=teamName;
-  document.getElementById("championSection").classList.remove("hidden");
-  renderChampion(teamName);
-  launchConfetti();
-  showToast(`🏆 ${teamName} is your CHAMPION!`,4000);
-  saveState(); recalcPoints(); renderFinal();
 }
 
 // ===================== CHAMPION =====================
@@ -1203,7 +1194,7 @@ function resetBracket() {
     locked:{group:false,r32:false,r16:false,qf:false,sf:false,final:false},
     correctPicks:{group:0,third_pool:0,r32:0,r16:0,qf:0,sf:0,third:0,final:0},
   };
-  ["thirdPlacePool","knockoutSection","thirdPlaceSection","finalSection","championSection","ratingSection"]
+  ["thirdPlacePool","knockoutSection","championSection","ratingSection"]
     .forEach(id=>document.getElementById(id).classList.add("hidden"));
   recalcPoints(); renderGroups();
   showToast("🗑️ Bracket reset!");
