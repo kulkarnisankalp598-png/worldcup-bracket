@@ -3,7 +3,11 @@
 
 [build.environment]
   NODE_VERSION = "18"
-  SECRETS_SCAN_OMIT_PATHS = "app.js"
 
 [functions]
   node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/scores"
+  to = "/.netlify/functions/scores"
+  status = 200
