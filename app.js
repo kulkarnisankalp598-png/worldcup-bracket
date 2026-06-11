@@ -911,13 +911,8 @@ async function fetchLiveResults() {
   if (btn) { btn.textContent="⏳ Checking..."; btn.disabled=true; }
 
   try {
-    const isLocal = ["localhost","127.0.0.1"].includes(window.location.hostname);
-    const endpoint = isLocal
-      ? "https://api.football-data.org/v4/competitions/WC/matches?season=2026"
-      : "/api/scores";
-    const headers = isLocal && typeof CONFIG!=="undefined"
-      ? { "X-Auth-Token": CONFIG.FOOTBALL_API_KEY }
-      : {};
+    const endpoint = "https://api.football-data.org/v4/competitions/WC/matches?season=2026";
+    const headers = { "X-Auth-Token": "b6150543c3714fc6aa027d7578ffb0b7" };
 
     const res     = await fetch(endpoint, { headers });
     const data    = await res.json();
