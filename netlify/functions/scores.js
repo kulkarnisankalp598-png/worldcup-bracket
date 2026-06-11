@@ -1,5 +1,4 @@
 exports.handler = async function(event, context) {
-  const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
   try {
     const res = await fetch(
       "https://api.football-data.org/v4/competitions/WC/matches?season=2026",
@@ -17,7 +16,8 @@ exports.handler = async function(event, context) {
   } catch(err) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({ error: err.message, stack: err.stack }),
     };
   }
 };
